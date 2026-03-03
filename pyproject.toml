@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cli-trans"
+version = "0.1.1"
+description = "英汉命令行翻译工具"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+  { name="刘瑞", email="liu15671677014@icloud.com" },
+]
+requires-python = ">=3.8"
+keywords = ["cli", "translate", "dictionary", "english", "chinese"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "requests>=2.31.0",
+    "colorama>=0.4.6",
+]
+
+[project.scripts]
+cli-trans = "cli_trans:main"
+
+[project.urls]
+Homepage = "https://github.com/bigfoolliu/cli-trans"
+Repository = "https://github.com/bigfoolliu/cli-trans"
+Issues = "https://github.com/bigfoolliu/cli-trans/issues"
