@@ -93,10 +93,147 @@ class YoudaoTranslator(BaseTranslator):
         return result
 
 
+class OxfordTranslator(BaseTranslator):
+    @property
+    def name(self) -> str:
+        return "oxford"
+
+    def translate(self, word: str) -> TranslationResult:
+        import requests as req
+        url = f"https://www.oxfordlearnersdictionaries.com/definition/english/{quote(word.lower())}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+        try:
+            resp = req.get(url, headers=headers, timeout=10)
+            return self._parse(resp.text, word)
+        except Exception as e:
+            return TranslationResult(word=word, source=self.name, raw=f"牛津词典不可用: {e}")
+
+    def _parse(self, html: str, word: str) -> TranslationResult:
+        result = TranslationResult(word=word.lower(), source=self.name)
+        soup = BeautifulSoup(html, "html.parser")
+        for entry in soup.select(".entry"):
+            pos_el = entry.select_one(".pos")
+            pos = pos_el.get_text(strip=True) if pos_el else ""
+            for def_el in entry.select(".def"):
+                text = def_el.get_text(strip=True)
+                if text:
+                    full = f"{pos} {text}" if pos else text
+                    _parse_pos_definition(full, result.meanings)
+        result.raw = self._build_raw(result.meanings)
+        return result
+
+
+class CollinsTranslator(BaseTranslator):
+    @property
+    def name(self) -> str:
+        return "collins"
+
+    def translate(self, word: str) -> TranslationResult:
+        import requests as req
+        url = f"https://www.collinsdictionary.com/dictionary/english/{quote(word.lower())}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+        try:
+            resp = req.get(url, headers=headers, timeout=10)
+            return self._parse(resp.text, word)
+        except Exception as e:
+            return TranslationResult(word=word, source=self.name, raw=f"柯林斯词典不可用: {e}")
+
+    def _parse(self, html: str, word: str) -> TranslationResult:
+        result = TranslationResult(word=word.lower(), source=self.name)
+        soup = BeautifulSoup(html, "html.parser")
+        for hom in soup.select(".hom"):
+            pos_el = hom.select_one(".pos")
+            pos = pos_el.get_text(strip=True) if pos_el else ""
+            for def_el in hom.select(".def"):
+                text = def_el.get_text(strip=True)
+                if text:
+                    full = f"{pos} {text}" if pos else text
+                    _parse_pos_definition(full, result.meanings)
+        result.raw = self._build_raw(result.meanings)
+        return result
+
+
+class CambridgeTranslator(BaseTranslator):
+    @property
+    def name(self) -> str:
+        return "cambridge"
+
+    def translate(self, word: str) -> TranslationResult:
+        import requests as req
+        url = f"https://dictionary.cambridge.org/dictionary/english/{quote(word.lower())}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+        try:
+            resp = req.get(url, headers=headers, timeout=10)
+            return self._parse(resp.text, word)
+        except Exception as e:
+            return TranslationResult(word=word, source=self.name, raw=f"剑桥词典不可用: {e}")
+
+    def _parse(self, html: str, word: str) -> TranslationResult:
+        result = TranslationResult(word=word.lower(), source=self.name)
+        soup = BeautifulSoup(html, "html.parser")
+        for entry in soup.select(".pr.entry-body__el"):
+            pos_el = entry.select_one(".pos")
+            pos = pos_el.get_text(strip=True) if pos_el else ""
+            for def_el in entry.select(".def"):
+                text = def_el.get_text(strip=True)
+                if text:
+                    full = f"{pos} {text}" if pos else text
+                    _parse_pos_definition(full, result.meanings)
+        result.raw = self._build_raw(result.meanings)
+        return result
+
+
+class FreeDictionaryTranslator(BaseTranslator):
+    @property
+    def name(self) -> str:
+        return "freedict"
+
+    def translate(self, word: str) -> TranslationResult:
+        import requests as req
+        url = f"https://www.thefreedictionary.com/{quote(word.lower())}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+        try:
+            resp = req.get(url, headers=headers, timeout=10)
+            return self._parse(resp.text, word)
+        except Exception as e:
+            return TranslationResult(word=word, source=self.name, raw=f"FreeDict不可用: {e}")
+
+    def _parse(self, html: str, word: str) -> TranslationResult:
+        result = TranslationResult(word=word.lower(), source=self.name)
+        soup = BeautifulSoup(html, "html.parser")
+        for pseg in soup.select(".pseg"):
+            pos_el = pseg.select_one(".pos")
+            pos = pos_el.get_text(strip=True) if pos_el else ""
+            for dsingle in pseg.select(".dsingle"):
+                text = dsingle.get_text(strip=True)
+                if text:
+                    full = f"{pos} {text}" if pos else text
+                    _parse_pos_definition(full, result.meanings)
+        if not result.meanings:
+            for def_el in soup.select(".definition"):
+                text = def_el.get_text(strip=True)
+                if text:
+                    _parse_pos_definition(text, result.meanings)
+        result.raw = self._build_raw(result.meanings)
+        return result
+
+
 class MultiTranslator:
     def __init__(self):
         self._sources: dict[str, BaseTranslator] = {}
         self._register(YoudaoTranslator())
+        self._register(OxfordTranslator())
+        self._register(CollinsTranslator())
+        self._register(CambridgeTranslator())
+        self._register(FreeDictionaryTranslator())
 
     def _register(self, translator: BaseTranslator) -> None:
         self._sources[translator.name] = translator
