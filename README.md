@@ -1,6 +1,34 @@
 # cli-trans
 
-命令行单词翻译工具。
+英汉命令行翻译工具。
+
+## 项目简介
+
+一个简洁高效的命令行翻译工具，支持英汉互译，缓存历史记录，彩色词性显示。
+
+## 技术栈
+
+| 技术 | 用途 |
+|------|------|
+| Python 3.8+ | 编程语言 |
+| requests | HTTP 请求，抓取有道词典网页 |
+| colorama | 终端彩色输出 |
+| sqlite3 | 本地数据库，存储翻译缓存和历史记录 |
+| re (正则) | 解析 HTML 网页，提取翻译结果 |
+| argparse | 命令行参数解析 |
+
+## 项目架构
+
+```text
+cliTranslate/
+├── cli_trans/              # 主包目录
+│   ├── __init__.py         # 核心逻辑
+│   ├── __main__.py         # 入口点
+│   └── formatter.py        # 格式化输出
+├── pyproject.toml          # 项目配置
+├── requirements.txt        # 依赖
+└── README.md               # 说明文档
+```
 
 ## 功能
 
