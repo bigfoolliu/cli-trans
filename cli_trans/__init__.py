@@ -4,10 +4,10 @@ import re
 import sqlite3
 import os
 import json
-import sys
 from typing import Optional
 from urllib.parse import quote
 from datetime import datetime
+from bs4 import BeautifulSoup
 
 # 启用颜色输出
 os.environ.setdefault("FORCE_COLOR", "1")
@@ -91,85 +91,46 @@ def is_translation_success(result: str) -> bool:
     return not any(keyword in result for keyword in error_keywords)
 
 
+def _parse_pos_definition(text: str, meanings: list) -> None:
+    """解析词性和释义文本，填充到 meanings 列表中"""
+    pos_match = re.match(r'^([a-z]+\.)\s*(.*)', text, re.IGNORECASE)
+    if not pos_match:
+        return
+    pos = pos_match.group(1)
+    definition = pos_match.group(2)
+    for m in meanings:
+        if m["pos"] == pos:
+            m["definitions"].append(definition)
+            return
+    meanings.append({"pos": pos, "definitions": [definition]})
+
+
 def parse_translation(html: str) -> dict:
     """
     解析有道词典网页，返回结构化数据
     返回: {"word": "hello", "meanings": [{"pos": "int.", "definitions": [...]}, ...], "raw": "原始文本"}
     """
     result = {"word": "", "meanings": [], "raw": ""}
+    soup = BeautifulSoup(html, "html.parser")
 
-    # 尝试主模式
-    pattern = r'<div class="trans-container">\s*<ul>(.*?)</ul>'
-    match = re.search(pattern, html, re.DOTALL)
-
-    if match:
-        ul_content = match.group(1)
-        # 提取每个 li
-        items = re.findall(r'<li>(.*?)</li>', ul_content, re.DOTALL)
-
-        for item in items[:10]:
-            # 清理 HTML
-            text = re.sub(r'<[^>]+>', '', item).strip()
-            if not text:
-                continue
-
-            # 解析词性和释义
-            # 格式: "int. 喂，你好（用于问候或打招呼）"
-            pos_match = re.match(r'^([a-z]+\.)\s*(.*)', text, re.IGNORECASE)
-
-            if pos_match:
-                pos = pos_match.group(1)
-                definition = pos_match.group(2)
-
-                # 查找或创建 meaning
-                meaning = None
-                for m in result["meanings"]:
-                    if m["pos"] == pos:
-                        meaning = m
-                        break
-
-                if meaning:
-                    meaning["definitions"].append(definition)
-                else:
-                    result["meanings"].append({
-                        "pos": pos,
-                        "definitions": [definition]
-                    })
-
-    # 备用模式
-    if not result["meanings"]:
-        simple_pattern = r'<div class="simple">(.*?)</div>'
-        simple_match = re.search(simple_pattern, html, re.DOTALL)
-
-        if simple_match:
-            simple_content = simple_match.group(1)
-            p_pattern = r'<p class="(wordGroup|paraphrase)">(.*?)</p>'
-            p_matches = re.findall(p_pattern, simple_content, re.DOTALL)
-
-            for _, content in p_matches[:10]:
-                text = re.sub(r'<[^>]+>', '', content).strip()
+    # 主模式：trans-container
+    trans_container = soup.select_one(".trans-container")
+    if trans_container:
+        ul = trans_container.select_one("ul")
+        if ul:
+            for li in ul.select("li"):
+                text = li.get_text(strip=True)
                 if not text:
                     continue
+                _parse_pos_definition(text, result["meanings"])
 
-                pos_match = re.match(r'^([a-z]+\.)\s*(.*)', text, re.IGNORECASE)
-
-                if pos_match:
-                    pos = pos_match.group(1)
-                    definition = pos_match.group(2)
-
-                    meaning = None
-                    for m in result["meanings"]:
-                        if m["pos"] == pos:
-                            meaning = m
-                            break
-
-                    if meaning:
-                        meaning["definitions"].append(definition)
-                    else:
-                        result["meanings"].append({
-                            "pos": pos,
-                            "definitions": [definition]
-                        })
+    # 备用模式：主模式未命中时尝试
+    if not result["meanings"]:
+        for tag in soup.select(".simple .wordGroup, .simple .paraphrase"):
+            text = tag.get_text(strip=True)
+            if not text:
+                continue
+            _parse_pos_definition(text, result["meanings"])
 
     # 生成 raw 文本（用于无颜色输出）
     if result["meanings"]:
