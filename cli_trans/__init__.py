@@ -12,7 +12,7 @@ from cli_trans.storage import Storage
 from cli_trans.repl import Repl
 from cli_trans.formatter import format_translation, format_single_source, format_history_item
 
-VERSION = "0.2.0"
+VERSION = "0.3.1"
 
 
 def translate_word(
