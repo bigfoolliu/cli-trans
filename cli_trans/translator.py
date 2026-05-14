@@ -70,7 +70,7 @@ class YoudaoTranslator(BaseTranslator):
         encoded_word = quote(word)
         url = f"https://dict.youdao.com/w/eng/{encoded_word}/"
         try:
-            resp = self.session.get(url, timeout=10)
+            resp = self.session.get(url, timeout=0.6)
             return self._parse(resp.text, word)
         except requests.exceptions.Timeout:
             return TranslationResult(word=word, source=self.name, raw="请求超时")
@@ -107,7 +107,7 @@ class OxfordTranslator(BaseTranslator):
     def translate(self, word: str) -> TranslationResult:
         url = f"https://www.oxfordlearnersdictionaries.com/definition/english/{quote(word.lower())}"
         try:
-            resp = self.session.get(url, timeout=10)
+            resp = self.session.get(url, timeout=0.6)
             return self._parse(resp.text, word)
         except Exception as e:
             return TranslationResult(word=word, source=self.name, raw=f"牛津词典不可用: {e}")
@@ -135,7 +135,7 @@ class CollinsTranslator(BaseTranslator):
     def translate(self, word: str) -> TranslationResult:
         url = f"https://www.collinsdictionary.com/dictionary/english/{quote(word.lower())}"
         try:
-            resp = self.session.get(url, timeout=10)
+            resp = self.session.get(url, timeout=0.6)
             return self._parse(resp.text, word)
         except Exception as e:
             return TranslationResult(word=word, source=self.name, raw=f"柯林斯词典不可用: {e}")
@@ -163,7 +163,7 @@ class CambridgeTranslator(BaseTranslator):
     def translate(self, word: str) -> TranslationResult:
         url = f"https://dictionary.cambridge.org/dictionary/english/{quote(word.lower())}"
         try:
-            resp = self.session.get(url, timeout=10)
+            resp = self.session.get(url, timeout=0.6)
             return self._parse(resp.text, word)
         except Exception as e:
             return TranslationResult(word=word, source=self.name, raw=f"剑桥词典不可用: {e}")
@@ -191,7 +191,7 @@ class FreeDictionaryTranslator(BaseTranslator):
     def translate(self, word: str) -> TranslationResult:
         url = f"https://www.thefreedictionary.com/{quote(word.lower())}"
         try:
-            resp = self.session.get(url, timeout=10)
+            resp = self.session.get(url, timeout=0.6)
             return self._parse(resp.text, word)
         except Exception as e:
             return TranslationResult(word=word, source=self.name, raw=f"FreeDict不可用: {e}")
