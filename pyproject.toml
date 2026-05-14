@@ -38,3 +38,8 @@ cli-trans = "cli_trans:main"
 Homepage = "https://github.com/bigfoolliu/cli-trans"
 Repository = "https://github.com/bigfoolliu/cli-trans"
 Issues = "https://github.com/bigfoolliu/cli-trans/issues"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]
