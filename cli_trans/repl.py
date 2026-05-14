@@ -1,4 +1,3 @@
-import sys
 import readline
 import os
 import json

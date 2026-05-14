@@ -35,7 +35,7 @@
 
 ### 数据流
 
-```
+```text
 请求 → cache lookup → 命中 → 缓存返回
                     → 未命中 → ThreadPoolExecutor 并发抓取 5 个源
                               → as_completed 逐条 yield (name, result)
@@ -44,7 +44,7 @@
 
 ### 架构总览
 
-```
+```text
 用户输入 (CLI 参数 / REPL 输入流)
        │
        ▼
