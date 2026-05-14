@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional
 from urllib.parse import quote
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup
 
 
@@ -36,6 +37,14 @@ def _parse_pos_definition(text: str, meanings: list[Meaning]) -> None:
 
 
 class BaseTranslator(ABC):
+    HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update(self.HEADERS)
+
     @property
     @abstractmethod
     def name(self) -> str:
@@ -60,11 +69,8 @@ class YoudaoTranslator(BaseTranslator):
     def translate(self, word: str) -> TranslationResult:
         encoded_word = quote(word)
         url = f"https://dict.youdao.com/w/eng/{encoded_word}/"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        }
         try:
-            resp = requests.get(url, headers=headers, timeout=10)
+            resp = self.session.get(url, timeout=10)
             return self._parse(resp.text, word)
         except requests.exceptions.Timeout:
             return TranslationResult(word=word, source=self.name, raw="请求超时")
@@ -99,13 +105,9 @@ class OxfordTranslator(BaseTranslator):
         return "oxford"
 
     def translate(self, word: str) -> TranslationResult:
-        import requests as req
         url = f"https://www.oxfordlearnersdictionaries.com/definition/english/{quote(word.lower())}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        }
         try:
-            resp = req.get(url, headers=headers, timeout=10)
+            resp = self.session.get(url, timeout=10)
             return self._parse(resp.text, word)
         except Exception as e:
             return TranslationResult(word=word, source=self.name, raw=f"牛津词典不可用: {e}")
@@ -131,13 +133,9 @@ class CollinsTranslator(BaseTranslator):
         return "collins"
 
     def translate(self, word: str) -> TranslationResult:
-        import requests as req
         url = f"https://www.collinsdictionary.com/dictionary/english/{quote(word.lower())}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        }
         try:
-            resp = req.get(url, headers=headers, timeout=10)
+            resp = self.session.get(url, timeout=10)
             return self._parse(resp.text, word)
         except Exception as e:
             return TranslationResult(word=word, source=self.name, raw=f"柯林斯词典不可用: {e}")
@@ -163,13 +161,9 @@ class CambridgeTranslator(BaseTranslator):
         return "cambridge"
 
     def translate(self, word: str) -> TranslationResult:
-        import requests as req
         url = f"https://dictionary.cambridge.org/dictionary/english/{quote(word.lower())}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        }
         try:
-            resp = req.get(url, headers=headers, timeout=10)
+            resp = self.session.get(url, timeout=10)
             return self._parse(resp.text, word)
         except Exception as e:
             return TranslationResult(word=word, source=self.name, raw=f"剑桥词典不可用: {e}")
@@ -195,13 +189,9 @@ class FreeDictionaryTranslator(BaseTranslator):
         return "freedict"
 
     def translate(self, word: str) -> TranslationResult:
-        import requests as req
         url = f"https://www.thefreedictionary.com/{quote(word.lower())}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        }
         try:
-            resp = req.get(url, headers=headers, timeout=10)
+            resp = self.session.get(url, timeout=10)
             return self._parse(resp.text, word)
         except Exception as e:
             return TranslationResult(word=word, source=self.name, raw=f"FreeDict不可用: {e}")
@@ -247,7 +237,15 @@ class MultiTranslator:
     ) -> dict[str, TranslationResult]:
         sources = sources or self.available_sources
         results = {}
-        for name in sources:
-            if name in self._sources:
-                results[name] = self._sources[name].translate(word)
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                executor.submit(self._sources[name].translate, word): name
+                for name in sources if name in self._sources
+            }
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    results[name] = future.result()
+                except Exception as e:
+                    results[name] = TranslationResult(word=word, source=name, raw=f"错误: {e}")
         return results
