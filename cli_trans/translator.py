@@ -234,9 +234,8 @@ class MultiTranslator:
 
     def translate(
         self, word: str, sources: Optional[list[str]] = None
-    ) -> dict[str, TranslationResult]:
+    ):
         sources = sources or self.available_sources
-        results = {}
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {
                 executor.submit(self._sources[name].translate, word): name
@@ -245,7 +244,8 @@ class MultiTranslator:
             for future in as_completed(futures):
                 name = futures[future]
                 try:
-                    results[name] = future.result()
-                except Exception as e:
-                    results[name] = TranslationResult(word=word, source=name, raw=f"错误: {e}")
-        return results
+                    result = future.result()
+                    if result.meanings:
+                        yield name, result
+                except Exception:
+                    pass

@@ -104,6 +104,31 @@ def format_multi_source(
     return "\n".join(lines).rstrip("\n")
 
 
+def format_single_source(source_name: str, result, use_color: bool = True) -> str:
+    lines = []
+    source_label = source_name.upper()
+    if use_color:
+        color = get_source_color(source_name)
+        lines.append(f"{color}[{source_label}]{Style.RESET_ALL}")
+    else:
+        lines.append(f"[{source_label}]")
+
+    if result.phonetic:
+        lines.append(f"  /{result.phonetic}/")
+
+    for m in result.meanings:
+        pos = m.pos
+        definitions = "；".join(m.definitions)
+        if use_color:
+            pos_color = get_pos_color(pos)
+            line = f"  {pos_color}{pos}{Style.RESET_ALL} {definitions}"
+        else:
+            line = f"  {pos} {definitions}"
+        lines.append(line)
+
+    return "\n".join(lines)
+
+
 def format_history_item(word: str, translation: str, created_at: str) -> str:
     trans_summary = translation[:27] + "..." if len(translation) > 27 else translation
     return f"{word:<15} {trans_summary:<30} {created_at}"

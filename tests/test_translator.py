@@ -73,12 +73,20 @@ class TestMultiTranslator:
         mt = MultiTranslator()
         assert "youdao" in mt.available_sources
 
-    def test_translate_returns_results(self):
+    def test_translate_yields_results(self):
         mt = MultiTranslator()
-        results = mt.translate("test")
-        assert "youdao" in results
+        results = list(mt.translate("test"))
+        names = [name for name, _ in results]
+        assert "youdao" in names
 
     def test_translate_filtered_sources(self):
         mt = MultiTranslator()
-        results = mt.translate("test", sources=["youdao"])
-        assert "youdao" in results
+        results = list(mt.translate("test", sources=["youdao"]))
+        names = [name for name, _ in results]
+        assert "youdao" in names
+
+    def test_translate_yields_only_with_meanings(self):
+        mt = MultiTranslator()
+        results = list(mt.translate("test"))
+        for _, result in results:
+            assert len(result.meanings) > 0

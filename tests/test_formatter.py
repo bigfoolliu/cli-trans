@@ -1,6 +1,6 @@
 import pytest
 from cli_trans.formatter import (
-    format_multi_source, format_translation, format_history_item
+    format_multi_source, format_single_source, format_translation, format_history_item
 )
 from cli_trans.translator import TranslationResult, Meaning
 
@@ -68,6 +68,27 @@ class TestFormatTranslationLegacy:
 
     def test_legacy_empty(self):
         assert format_translation({}, use_color=False) == ""
+
+
+class TestFormatSingleSource:
+    def test_basic(self):
+        result = TranslationResult(
+            word="hello", source="youdao",
+            meanings=[Meaning(pos="int.", definitions=["喂，你好"])],
+        )
+        output = format_single_source("youdao", result, use_color=False)
+        assert "[YOUDAO]" in output
+        assert "int." in output
+        assert "喂，你好" in output
+
+    def test_phonetic(self):
+        result = TranslationResult(
+            word="hello", source="youdao",
+            meanings=[Meaning(pos="int.", definitions=["喂"])],
+            phonetic="həˈləʊ",
+        )
+        output = format_single_source("youdao", result, use_color=False)
+        assert "/həˈləʊ/" in output
 
 
 class TestFormatHistoryItem:

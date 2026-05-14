@@ -6,7 +6,7 @@ from typing import Optional
 
 from cli_trans.translator import MultiTranslator
 from cli_trans.storage import Storage
-from cli_trans.formatter import format_multi_source, format_translation, format_history_item
+from cli_trans.formatter import format_single_source, format_translation, format_history_item
 
 
 HISTORY_FILE = os.path.expanduser("~/.cli-trans-repl-history")
@@ -83,44 +83,47 @@ class Repl:
             return
         words = text.split()
         for word in words:
-            result, is_cached = self._translate_word(word)
-            prefix = "[缓存]" if is_cached else "[在线]"
-            print(f"{word}: {prefix}")
-            print(result)
-            print()
+            word = word.strip().lower()
 
-    def _translate_word(self, word: str) -> tuple[str, bool]:
-        word = word.strip().lower()
-        cached = self.storage.get_cached(word)
-        if cached:
-            translation, translation_raw, _ = cached
-            if translation_raw:
-                try:
-                    data = json.loads(translation_raw)
-                    data["word"] = word
-                    return format_translation(data, use_color=True), True
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            return translation, True
+            cached = self.storage.get_cached(word)
+            if cached:
+                translation, translation_raw, _ = cached
+                if translation_raw:
+                    try:
+                        data = json.loads(translation_raw)
+                        data["word"] = word
+                        formatted = format_translation(data, use_color=True)
+                    except (json.JSONDecodeError, TypeError):
+                        formatted = translation
+                else:
+                    formatted = translation
+                print(f"{word}: [缓存]")
+                print(formatted)
+                print()
+                continue
 
-        sources = self.current_source
-        results = self.translator.translate(word, sources=sources)
-        formatted = format_multi_source(results, use_color=True)
+            print(f"{word}: [在线]")
+            found = False
+            cached_flag = False
+            for source_name, tr in self.translator.translate(word, sources=self.current_source):
+                found = True
+                print(format_single_source(source_name, tr))
+                print()
+                if not cached_flag:
+                    legacy_data = {
+                        "word": word,
+                        "meanings": [{"pos": m.pos, "definitions": m.definitions} for m in tr.meanings]
+                    }
+                    self.storage.save_cache(
+                        word,
+                        format_translation(legacy_data, use_color=False),
+                        json.dumps(legacy_data, ensure_ascii=False)
+                    )
+                    cached_flag = True
 
-        for _, tr in results.items():
-            if tr.meanings:
-                legacy_data = {
-                    "word": word,
-                    "meanings": [{"pos": m.pos, "definitions": m.definitions} for m in tr.meanings]
-                }
-                self.storage.save_cache(
-                    word,
-                    format_translation(legacy_data, use_color=False),
-                    json.dumps(legacy_data, ensure_ascii=False)
-                )
-                break
-
-        return formatted, False
+            if not found:
+                print("  所有词典源均不可用")
+                print()
 
     def _cmd_save(self, word: str):
         if not word:

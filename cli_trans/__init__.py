@@ -10,7 +10,7 @@ init(autoreset=True)
 from cli_trans.translator import MultiTranslator
 from cli_trans.storage import Storage
 from cli_trans.repl import Repl
-from cli_trans.formatter import format_translation, format_multi_source, format_history_item
+from cli_trans.formatter import format_translation, format_single_source, format_history_item
 
 VERSION = "0.2.0"
 
@@ -23,7 +23,7 @@ def translate_word(
 ) -> tuple[str, bool]:
     word = word.strip().lower()
     if not word:
-        return "请输入要翻译的单词", False
+        return "请输入要翻译的单词", True
 
     if not force:
         cached = storage.get_cached(word)
@@ -39,23 +39,7 @@ def translate_word(
                     pass
             return translation, True
 
-    results = translator.translate(word)
-    formatted = format_multi_source(results, use_color=True)
-
-    for _, tr in results.items():
-        if tr.meanings:
-            legacy_data = {
-                "word": word,
-                "meanings": [{"pos": m.pos, "definitions": m.definitions} for m in tr.meanings]
-            }
-            storage.save_cache(
-                word,
-                format_translation(legacy_data, use_color=False),
-                json.dumps(legacy_data, ensure_ascii=False)
-            )
-            break
-
-    return formatted, False
+    return None, False
 
 
 def main():
@@ -77,7 +61,6 @@ def main():
 
     args = parser.parse_args()
 
-    # --- Vocab commands ---
     if args.vocab_add:
         storage.add_vocab(args.vocab_add)
         print(f"已加入生词本: {args.vocab_add}")
@@ -100,13 +83,11 @@ def main():
         print(f"已从生词本删除: {args.vocab_rm}")
         return
 
-    # --- REPL mode ---
     if args.interactive or (not args.words and not args.list and not args.clear):
         repl = Repl(translator, storage)
         repl.run()
         return
 
-    # --- History ---
     if args.list:
         records = storage.list_history(args.limit)
         if not records:
@@ -118,13 +99,11 @@ def main():
             print(format_history_item(word, translation, created_at))
         return
 
-    # --- Clear history ---
     if args.clear:
         count = storage.clear_history()
         print(f"已清除 {count} 条历史记录")
         return
 
-    # --- Translate ---
     if not args.words:
         parser.print_help()
         return
@@ -134,11 +113,36 @@ def main():
         sources = [s.strip() for s in args.source.split(",")]
 
     for word in args.words:
+        word = word.strip().lower()
         result, is_cached = translate_word(word, translator, storage, args.force)
-        prefix = "[缓存]" if is_cached else "[在线]"
-        print(f"{word}: {prefix}")
-        print(result)
-        print()
+        print(f"{word}: {'[缓存]' if is_cached else '[在线]'}")
+
+        if is_cached:
+            print(result)
+            print()
+            continue
+
+        found = False
+        for source_name, tr in translator.translate(word, sources=sources):
+            found = True
+            print(format_single_source(source_name, tr))
+            print()
+
+            if not is_cached:
+                legacy_data = {
+                    "word": word,
+                    "meanings": [{"pos": m.pos, "definitions": m.definitions} for m in tr.meanings]
+                }
+                storage.save_cache(
+                    word,
+                    format_translation(legacy_data, use_color=False),
+                    json.dumps(legacy_data, ensure_ascii=False)
+                )
+                is_cached = True
+
+        if not found:
+            print("  所有词典源均不可用")
+            print()
 
 
 if __name__ == "__main__":
