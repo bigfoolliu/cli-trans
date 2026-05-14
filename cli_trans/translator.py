@@ -1,0 +1,116 @@
+import requests
+import re
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import Optional
+from urllib.parse import quote
+from bs4 import BeautifulSoup
+
+
+@dataclass
+class Meaning:
+    pos: str
+    definitions: list[str] = field(default_factory=list)
+
+
+@dataclass
+class TranslationResult:
+    word: str
+    source: str
+    meanings: list[Meaning] = field(default_factory=list)
+    phonetic: str = ""
+    raw: str = ""
+
+
+def _parse_pos_definition(text: str, meanings: list[Meaning]) -> None:
+    pos_match = re.match(r'^([a-z]+\.)\s*(.*)', text, re.IGNORECASE)
+    if not pos_match:
+        return
+    pos = pos_match.group(1)
+    definition = pos_match.group(2)
+    for m in meanings:
+        if m.pos == pos:
+            m.definitions.append(definition)
+            return
+    meanings.append(Meaning(pos=pos, definitions=[definition]))
+
+
+class BaseTranslator(ABC):
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        ...
+
+    @abstractmethod
+    def translate(self, word: str) -> TranslationResult:
+        ...
+
+    def _build_raw(self, meanings: list[Meaning]) -> str:
+        parts = []
+        for m in meanings:
+            parts.append(f"{m.pos} {'；'.join(m.definitions)}")
+        return "\n".join(parts)
+
+
+class YoudaoTranslator(BaseTranslator):
+    @property
+    def name(self) -> str:
+        return "youdao"
+
+    def translate(self, word: str) -> TranslationResult:
+        encoded_word = quote(word)
+        url = f"https://dict.youdao.com/w/eng/{encoded_word}/"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
+            return self._parse(resp.text, word)
+        except requests.exceptions.Timeout:
+            return TranslationResult(word=word, source=self.name, raw="请求超时")
+        except requests.exceptions.ConnectionError:
+            return TranslationResult(word=word, source=self.name, raw="无法连接")
+        except Exception as e:
+            return TranslationResult(word=word, source=self.name, raw=f"错误: {e}")
+
+    def _parse(self, html: str, word: str) -> TranslationResult:
+        result = TranslationResult(word=word.lower(), source=self.name)
+        soup = BeautifulSoup(html, "html.parser")
+        container = soup.select_one(".trans-container")
+        if container:
+            ul = container.select_one("ul")
+            if ul:
+                for li in ul.select("li"):
+                    text = li.get_text(strip=True)
+                    if text:
+                        _parse_pos_definition(text, result.meanings)
+        if not result.meanings:
+            for tag in soup.select(".simple .wordGroup, .simple .paraphrase"):
+                text = tag.get_text(strip=True)
+                if text:
+                    _parse_pos_definition(text, result.meanings)
+        result.raw = self._build_raw(result.meanings)
+        return result
+
+
+class MultiTranslator:
+    def __init__(self):
+        self._sources: dict[str, BaseTranslator] = {}
+        self._register(YoudaoTranslator())
+
+    def _register(self, translator: BaseTranslator) -> None:
+        self._sources[translator.name] = translator
+
+    @property
+    def available_sources(self) -> list[str]:
+        return list(self._sources.keys())
+
+    def translate(
+        self, word: str, sources: Optional[list[str]] = None
+    ) -> dict[str, TranslationResult]:
+        sources = sources or self.available_sources
+        results = {}
+        for name in sources:
+            if name in self._sources:
+                results[name] = self._sources[name].translate(word)
+        return results
